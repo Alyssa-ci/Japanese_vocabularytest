@@ -158,7 +158,7 @@ export default function Processing() {
           exit={{ opacity: 0, y: -10 }}
           className="text-lg text-gray-600 italic"
         >
-          "{waitingMessages[currentMessage]}"
+          {waitingMessages[currentMessage]}
         </motion.div>
       </div>
     </div>
