@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { ReportData, JLPTLevel, Question } from '@/lib/types'
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from 'recharts'
+import jsPDF from 'jspdf'
 
 export default function ReportPage() {
   const params = useParams()
@@ -16,6 +17,43 @@ export default function ReportPage() {
     wrongAnswers: false,
   })
   const [showWrongAnswers, setShowWrongAnswers] = useState(false)
+  const [showShareOptions, setShowShareOptions] = useState(false)
+
+  // 分享到不同平台
+  const shareToPlatform = (platform: 'wechat' | 'weibo' | 'xiaohongshu') => {
+    if (!report) return
+    
+    // 创建分享内容
+    const shareText = `我刚测了我的日语词汇力，达到了${report.overallLevel}水平！你也来试试吧～`
+    const shareUrl = window.location.href
+    
+    switch (platform) {
+      case 'wechat':
+        // 微信分享：由于微信限制，显示提示让用户复制链接
+        alert('请复制以下链接到微信中分享：\n' + shareUrl + '\n\n分享文案：' + shareText)
+        // 复制链接到剪贴板
+        navigator.clipboard.writeText(shareUrl).then(() => {
+          alert('链接已复制到剪贴板，请粘贴到微信分享给好友')
+        })
+        break
+      case 'weibo':
+        // 微博分享链接
+        const weiboLink = `http://service.weibo.com/share/share.php?url=${encodeURIComponent(shareUrl)}&title=${encodeURIComponent(shareText)}`
+        window.open(weiboLink, '_blank', 'width=600,height=400')
+        break
+      case 'xiaohongshu':
+        // 小红书分享：由于API限制，显示提示让用户复制链接
+        alert('请复制以下链接到小红书分享：\n' + shareUrl + '\n\n分享文案：' + shareText)
+        // 复制链接到剪贴板
+        navigator.clipboard.writeText(shareUrl).then(() => {
+          alert('链接已复制到剪贴板，请粘贴到小红书分享')
+        })
+        break
+    }
+    
+    // 关闭分享选项弹窗
+    setShowShareOptions(false)
+  }
 
   useEffect(() => {
     // 从localStorage加载报告
@@ -88,14 +126,49 @@ export default function ReportPage() {
           <p className="text-gray-600 mb-4">
             测评时间：{new Date(report.createdAt).toLocaleString('zh-CN')}
           </p>
-          <div className="flex justify-center space-x-4">
-            <button className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+          <div className="flex justify-center">
+            <button 
+              onClick={() => setShowShareOptions(true)}
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
               分享报告
             </button>
-            <button className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">
-              下载PDF
-            </button>
           </div>
+
+          {/* 分享选项弹窗 */}
+          {showShareOptions && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div className="bg-white rounded-lg shadow-lg p-8 max-w-md w-full">
+                <h3 className="text-2xl font-bold mb-6 text-center">选择分享平台</h3>
+                <div className="space-y-4">
+                  <button 
+                    onClick={() => shareToPlatform('wechat')}
+                    className="w-full px-6 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 flex items-center justify-center"
+                  >
+                    <span className="mr-2">💬</span> 微信
+                  </button>
+                  <button 
+                    onClick={() => shareToPlatform('weibo')}
+                    className="w-full px-6 py-3 bg-red-500 text-white rounded-lg hover:bg-red-600 flex items-center justify-center"
+                  >
+                    <span className="mr-2">📱</span> 微博
+                  </button>
+                  <button 
+                    onClick={() => shareToPlatform('xiaohongshu')}
+                    className="w-full px-6 py-3 bg-pink-400 text-white rounded-lg hover:bg-pink-500 flex items-center justify-center"
+                  >
+                    <span className="mr-2">📕</span> 小红书
+                  </button>
+                </div>
+                <button 
+                  onClick={() => setShowShareOptions(false)}
+                  className="w-full mt-6 px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+                >
+                  取消
+                </button>
+              </div>
+            </div>
+          )}
         </motion.div>
 
         {/* 核心结果展示 */}
@@ -207,6 +280,10 @@ export default function ReportPage() {
                 <p className="text-gray-700">{rec}</p>
               </div>
             ))}
+            <div className="flex items-start">
+              <span className="text-blue-600 mr-3">•</span>
+              <p className="text-gray-700 italic">还有好好听静先生上课www</p>
+            </div>
           </div>
 
           <div className="mt-6 p-4 bg-blue-50 rounded-lg">
@@ -264,9 +341,9 @@ export default function ReportPage() {
                     if (!item) return null
                     const { answer, question, index } = item
                     const typeNames = {
-                      'kanji-to-hiragana': '看汉字选平假名',
+                      'kanji-to-hiragana': '看汉字选假名',
                       'hiragana-to-kanji': '看假名选汉字',
-                      'katakana-to-chinese': '片假名译中文',
+                      'katakana-to-chinese': '日译中',
                     }
                     return (
                       <div key={idx} className="border-l-4 border-red-500 pl-4 py-4 bg-red-50 rounded">
@@ -310,29 +387,80 @@ export default function ReportPage() {
           </motion.div>
         )}
 
-        {/* 社交分享组件 */}
+        {/* 日语励志名言 */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.7 }}
-          className="bg-white rounded-lg shadow-lg p-8 text-center"
+          className="relative bg-gradient-to-br from-purple-100 via-pink-100 to-blue-100 rounded-lg shadow-lg p-8 text-center overflow-hidden"
+          style={{
+            backgroundImage: `
+              radial-gradient(circle at 20% 30%, rgba(255, 215, 0, 0.3) 0%, transparent 20%),
+              radial-gradient(circle at 80% 70%, rgba(255, 105, 180, 0.3) 0%, transparent 20%),
+              radial-gradient(circle at 40% 80%, rgba(138, 43, 226, 0.3) 0%, transparent 20%),
+              radial-gradient(circle at 70% 20%, rgba(0, 255, 255, 0.3) 0%, transparent 20%)
+            `
+          }}
         >
-          <h3 className="text-xl font-bold mb-4">分享我的日语水平</h3>
-          <p className="text-gray-600 mb-4">
-            我刚测了我的日语词汇力，达到了{report.overallLevel}水平！你也来试试吧～
-          </p>
-          <div className="flex justify-center space-x-4">
-            <button className="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600">
-              微信
-            </button>
-            <button className="px-6 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600">
-              微博
-            </button>
-            <button className="px-6 py-2 bg-blue-400 text-white rounded-lg hover:bg-blue-500">
-              Twitter
-            </button>
+          {/* 像素星星装饰 */}
+          <div className="absolute top-4 left-4 text-yellow-400 text-xl">✦</div>
+          <div className="absolute top-4 right-4 text-yellow-400 text-xl">✦</div>
+          <div className="absolute bottom-4 left-4 text-yellow-400 text-xl">✦</div>
+          <div className="absolute bottom-4 right-4 text-yellow-400 text-xl">✦</div>
+          <div className="absolute top-1/2 left-4 text-yellow-400 text-xl">✦</div>
+          <div className="absolute top-1/2 right-4 text-yellow-400 text-xl">✦</div>
+          
+          {/* 像素艺术风星星背景 */}
+          <div className="absolute inset-0 opacity-10">
+            {[...Array(20)].map((_, i) => (
+              <div
+                key={i}
+                className="absolute text-yellow-400"
+                style={{
+                  top: `${Math.random() * 100}%`,
+                  left: `${Math.random() * 100}%`,
+                  fontSize: `${Math.random() * 12 + 8}px`,
+                  transform: `rotate(${Math.random() * 360}deg)`,
+                  animation: `twinkle ${Math.random() * 3 + 2}s infinite alternate`
+                }}
+              >
+                ✦
+              </div>
+            ))}
           </div>
+          
+          {/* 日语励志名言 */}
+          <div className="relative z-10">
+            <div className="text-center">
+              <p className="text-3xl md:text-4xl font-bold mb-2 text-transparent bg-clip-text bg-gradient-to-r from-purple-600 via-pink-500 to-blue-600" style={{ fontFamily: '"Pixelify Sans", "Helvetica", sans-serif' }}>
+                意志のあるところに、
+              </p>
+              <p className="text-3xl md:text-4xl font-bold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-purple-600 via-pink-500 to-blue-600" style={{ fontFamily: '"Pixelify Sans", "Helvetica", sans-serif' }}>
+                道は開ける
+              </p>
+            </div>
+            <p className="text-gray-600 mt-4">
+              Where there is a will, there is a way
+            </p>
+          </div>
+          
+          {/* 微水彩效果 */}
+          <div className="absolute inset-0 bg-gradient-to-br from-purple-50 via-transparent to-blue-50 opacity-50 mix-blend-overlay"></div>
         </motion.div>
+        
+        {/* 像素艺术动画样式 */}
+        <style jsx>{`
+          @keyframes twinkle {
+            0% {
+              opacity: 0.3;
+              transform: scale(0.8);
+            }
+            100% {
+              opacity: 1;
+              transform: scale(1.2);
+            }
+          }
+        `}</style>
       </main>
     </div>
   )

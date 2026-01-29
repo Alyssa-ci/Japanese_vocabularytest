@@ -63,9 +63,7 @@ export default function Home() {
                 <div className="w-16 h-16 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold text-lg mb-2">
                   {level}
                 </div>
-                {index < levels.length - 1 && (
-                  <div className="w-8 h-1 bg-blue-300"></div>
-                )}
+                <div className="w-8 h-1 bg-blue-300"></div>
               </motion.div>
             ))}
           </motion.div>
@@ -146,9 +144,9 @@ export default function Home() {
       {/* 页脚 */}
       <footer className="bg-gray-800 text-white py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <p className="mb-2">© 2024 日本語語彙力診断. All rights reserved.</p>
+          <p className="mb-2">© 2026 日本語語彙力診断. All rights reserved.</p>
           <p className="text-gray-400 text-sm">
-            联系邮箱: contact@vocab-assessment.com | 
+            联系邮箱: 771329859@qq.com | 
             <Link href="/privacy" className="hover:text-white underline ml-2">隐私政策</Link>
           </p>
         </div>

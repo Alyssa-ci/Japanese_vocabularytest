@@ -13,9 +13,12 @@ const MAX_QUESTIONS = 25
 export default function QuizQuestion() {
   const router = useRouter()
   const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null)
+  const [shuffledOptions, setShuffledOptions] = useState<string[]>([])
+  const [correctAnswerIndex, setCorrectAnswerIndex] = useState<number>(0)
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null)
   const [isSubmitted, setIsSubmitted] = useState(false)
   const [showExplanation, setShowExplanation] = useState(false)
+  const [soundEnabled, setSoundEnabled] = useState(false)
   const [questionIndex, setQuestionIndex] = useState(1)
   const [currentLevel, setCurrentLevel] = useState<JLPTLevel>('N5')
   const [answers, setAnswers] = useState<QuizAnswer[]>([])
@@ -31,8 +34,30 @@ export default function QuizQuestion() {
     if (settings) {
       const parsed = JSON.parse(settings)
       setShowExplanation(parsed.showExplanation || false)
+      setSoundEnabled(parsed.soundEnabled || false)
     }
   }, [])
+
+  // 打乱选项顺序的函数
+  const shuffleOptions = (question: Question) => {
+    // 创建选项的副本
+    const options = [...question.options]
+    // 创建索引数组
+    const indices = options.map((_, index) => index)
+    
+    //  Fisher-Yates 洗牌算法
+    for (let i = indices.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1))
+      ;[indices[i], indices[j]] = [indices[j], indices[i]]
+    }
+    
+    // 根据打乱的索引创建新的选项数组
+    const shuffled = indices.map(index => options[index])
+    // 找到正确答案在打乱后的位置
+    const correctIndex = indices.indexOf(question.correctAnswer)
+    
+    return { shuffled, correctIndex }
+  }
 
   // 初始化：清空之前的答题记录并加载第一题
   useEffect(() => {
@@ -44,7 +69,10 @@ export default function QuizQuestion() {
     setUsedQuestionIds(new Set())
     const question = getRandomQuestion('N5', new Set())
     if (question) {
+      const { shuffled, correctIndex } = shuffleOptions(question)
       setCurrentQuestion(question)
+      setShuffledOptions(shuffled)
+      setCorrectAnswerIndex(correctIndex)
       setUsedQuestionIds(new Set([question.id]))
       setQuestionStartTime(Date.now())
     }
@@ -55,7 +83,10 @@ export default function QuizQuestion() {
     setUsedQuestionIds(prevUsedIds => {
       const question = getRandomQuestion(level, prevUsedIds)
       if (question) {
+        const { shuffled, correctIndex } = shuffleOptions(question)
         setCurrentQuestion(question)
+        setShuffledOptions(shuffled)
+        setCorrectAnswerIndex(correctIndex)
         setSelectedAnswer(null)
         setIsSubmitted(false)
         setQuestionStartTime(Date.now())
@@ -73,7 +104,10 @@ export default function QuizQuestion() {
             const nextLevel = levelOrder[currentIndex + i]
             const nextQuestion = getRandomQuestion(nextLevel, prevUsedIds)
             if (nextQuestion) {
+              const { shuffled, correctIndex } = shuffleOptions(nextQuestion)
               setCurrentQuestion(nextQuestion)
+              setShuffledOptions(shuffled)
+              setCorrectAnswerIndex(correctIndex)
               setCurrentLevel(nextLevel)
               setSelectedAnswer(null)
               setIsSubmitted(false)
@@ -86,7 +120,10 @@ export default function QuizQuestion() {
             const prevLevel = levelOrder[currentIndex - i]
             const prevQuestion = getRandomQuestion(prevLevel, prevUsedIds)
             if (prevQuestion) {
+              const { shuffled, correctIndex } = shuffleOptions(prevQuestion)
               setCurrentQuestion(prevQuestion)
+              setShuffledOptions(shuffled)
+              setCorrectAnswerIndex(correctIndex)
               setCurrentLevel(prevLevel)
               setSelectedAnswer(null)
               setIsSubmitted(false)
@@ -101,7 +138,7 @@ export default function QuizQuestion() {
         return prevUsedIds
       }
     })
-  }, [router])
+  }, [router, shuffleOptions])
 
   const handleAnswerSelect = (index: number) => {
     if (!isSubmitted) {
@@ -113,7 +150,7 @@ export default function QuizQuestion() {
     if (selectedAnswer === null || !currentQuestion) return
 
     const timeSpent = Math.floor((Date.now() - questionStartTime) / 1000)
-    const isCorrect = selectedAnswer === currentQuestion.correctAnswer
+    const isCorrect = selectedAnswer === correctAnswerIndex
 
     const answer: QuizAnswer = {
       questionId: currentQuestion.id,
@@ -128,6 +165,36 @@ export default function QuizQuestion() {
     setAnswers(newAnswers)
     setQuestions(newQuestions)
     setIsSubmitted(true)
+
+    // 播放音效反馈
+    if (soundEnabled) {
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
+      const oscillator = audioContext.createOscillator()
+      const gainNode = audioContext.createGain()
+      
+      oscillator.connect(gainNode)
+      gainNode.connect(audioContext.destination)
+      
+      if (isCorrect) {
+        // 正确答案音效：上升音调
+        oscillator.type = 'sine'
+        oscillator.frequency.setValueAtTime(440, audioContext.currentTime) // A4
+        oscillator.frequency.exponentialRampToValueAtTime(880, audioContext.currentTime + 0.3) // A5
+        gainNode.gain.setValueAtTime(0.1, audioContext.currentTime)
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3)
+        oscillator.start(audioContext.currentTime)
+        oscillator.stop(audioContext.currentTime + 0.3)
+      } else {
+        // 错误答案音效：下降音调
+        oscillator.type = 'sine'
+        oscillator.frequency.setValueAtTime(880, audioContext.currentTime) // A5
+        oscillator.frequency.exponentialRampToValueAtTime(440, audioContext.currentTime + 0.3) // A4
+        gainNode.gain.setValueAtTime(0.1, audioContext.currentTime)
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3)
+        oscillator.start(audioContext.currentTime)
+        oscillator.stop(audioContext.currentTime + 0.3)
+      }
+    }
 
     // 更新最近答案记录（用于自适应算法）
     const newRecentAnswers = [...recentAnswers, { isCorrect, level: currentQuestion.level }]
@@ -197,6 +264,37 @@ export default function QuizQuestion() {
     loadQuestion(currentLevel)
   }
 
+  // 测试函数：验证正确答案位置的随机化
+  const testAnswerShuffling = useCallback(() => {
+    // 测试100次打乱，统计每个位置出现的次数
+    const positionCounts = [0, 0, 0, 0]
+    const testQuestion: Question = {
+      id: 'test-question',
+      level: 'N5',
+      type: 'kanji-to-hiragana',
+      question: '测试',
+      options: ['选项1', '选项2', '选项3', '选项4'],
+      correctAnswer: 0,
+      explanation: '测试题目'
+    }
+
+    for (let i = 0; i < 100; i++) {
+      const { correctIndex } = shuffleOptions(testQuestion)
+      positionCounts[correctIndex]++
+    }
+
+    console.log('正确答案位置分布:', positionCounts)
+    console.log('随机性测试完成：每个位置的出现次数应该大致相等')
+  }, [])
+
+  // 初始化时运行测试
+  useEffect(() => {
+    // 仅在开发环境运行测试
+    if (process.env.NODE_ENV === 'development') {
+      testAnswerShuffling()
+    }
+  }, [testAnswerShuffling])
+
   if (!currentQuestion) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -214,19 +312,18 @@ export default function QuizQuestion() {
       <div className="bg-white shadow-sm sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="mb-2">
-            <div className="flex justify-between text-sm text-gray-600 mb-1">
-              <span>第 {questionIndex}/{MAX_QUESTIONS} 题</span>
-              <span>当前级别：{currentLevel}</span>
+              <div className="flex justify-between text-sm text-gray-600 mb-1">
+                <span>当前级别：{currentLevel}</span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-3">
+                <motion.div
+                  className="bg-gradient-to-r from-blue-500 to-blue-600 h-3 rounded-full"
+                  initial={{ width: 0 }}
+                  animate={{ width: `${progress}%` }}
+                  transition={{ duration: 0.3 }}
+                />
+              </div>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-3">
-              <motion.div
-                className="bg-gradient-to-r from-blue-500 to-blue-600 h-3 rounded-full"
-                initial={{ width: 0 }}
-                animate={{ width: `${progress}%` }}
-                transition={{ duration: 0.3 }}
-              />
-            </div>
-          </div>
           <p className="text-xs text-gray-500 text-center">
             预计还有 {Math.max(1, MAX_QUESTIONS - questionIndex)} 题
           </p>
@@ -244,11 +341,10 @@ export default function QuizQuestion() {
             className="bg-white rounded-lg shadow-lg p-8 mb-8"
           >
             <div className="text-center mb-6">
-              <h2 className="text-2xl font-bold mb-4">【第{questionIndex}题】</h2>
               <div className="flex justify-center space-x-4 text-sm text-gray-600 mb-4">
                 <span>🎯 题目类型：{
-                  currentQuestion.type === 'kanji-to-hiragana' ? '看汉字选平假名' :
-                  currentQuestion.type === 'hiragana-to-kanji' ? '看假名选汉字' : '片假名译中文'
+                  currentQuestion.type === 'kanji-to-hiragana' ? '看汉字选假名' :
+                  currentQuestion.type === 'hiragana-to-kanji' ? '看假名选汉字' : '日译中'
                 }</span>
                 <span>📊 当前级别：{currentQuestion.level}</span>
               </div>
@@ -270,13 +366,13 @@ export default function QuizQuestion() {
               </p>
 
               <div className="space-y-4">
-                {currentQuestion.options.map((option, index) => {
+                {shuffledOptions.map((option, index) => {
                   let buttonClass = "w-full p-4 text-left border-2 rounded-lg transition-all "
                   
                   if (isSubmitted) {
-                    if (index === currentQuestion.correctAnswer) {
+                    if (index === correctAnswerIndex) {
                       buttonClass += "bg-green-100 border-green-500 text-green-800"
-                    } else if (index === selectedAnswer && !currentQuestion.correctAnswer) {
+                    } else if (index === selectedAnswer && index !== correctAnswerIndex) {
                       buttonClass += "bg-red-100 border-red-500 text-red-800"
                     } else {
                       buttonClass += "bg-gray-50 border-gray-300"

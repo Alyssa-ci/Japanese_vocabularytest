@@ -40,7 +40,6 @@ export default function QuizIntro() {
               <div className="w-3 h-3 rounded-full bg-gray-300"></div>
               <div className="w-3 h-3 rounded-full bg-gray-300"></div>
             </div>
-            <span className="text-sm font-medium text-gray-700">第1/15题</span>
           </div>
         </div>
       </div>
@@ -63,9 +62,9 @@ export default function QuizIntro() {
               <div className="text-gray-700">
                 <p className="font-semibold mb-2">题型：三种选择题</p>
                 <ul className="list-disc list-inside ml-4 space-y-1">
-                  <li>看汉字选择对应平假名（如：影響 → えいきょう）</li>
+                  <li>看汉字选择假名（如：影響 → えいきょう）</li>
                   <li>看假名选择汉字（如：あかり → 明かり）</li>
-                  <li>片假名翻译成中文（如：カラオケボックス → 卡拉OK包厢）</li>
+                  <li>日译中（如：カラオケボックス → 卡拉OK包厢）</li>
                 </ul>
               </div>
             </div>
