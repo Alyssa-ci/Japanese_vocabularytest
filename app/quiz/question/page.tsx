@@ -39,7 +39,7 @@ export default function QuizQuestion() {
   }, [])
 
   // 打乱选项顺序的函数
-  const shuffleOptions = (question: Question) => {
+  const shuffleOptions = useCallback((question: Question) => {
     // 创建选项的副本
     const options = [...question.options]
     // 创建索引数组
@@ -57,7 +57,7 @@ export default function QuizQuestion() {
     const correctIndex = indices.indexOf(question.correctAnswer)
     
     return { shuffled, correctIndex }
-  }
+  }, [])
 
   // 初始化：清空之前的答题记录并加载第一题
   useEffect(() => {
@@ -76,7 +76,7 @@ export default function QuizQuestion() {
       setUsedQuestionIds(new Set([question.id]))
       setQuestionStartTime(Date.now())
     }
-  }, [])
+  }, [shuffleOptions])
 
   const loadQuestion = useCallback((level: JLPTLevel) => {
     // 使用函数式更新确保获取最新的 usedQuestionIds
@@ -285,7 +285,7 @@ export default function QuizQuestion() {
 
     console.log('正确答案位置分布:', positionCounts)
     console.log('随机性测试完成：每个位置的出现次数应该大致相等')
-  }, [])
+  }, [shuffleOptions])
 
   // 初始化时运行测试
   useEffect(() => {

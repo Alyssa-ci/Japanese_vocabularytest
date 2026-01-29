@@ -34,7 +34,7 @@ export default function PrivacyPolicy() {
           
           <div className="space-y-6 text-gray-700">
             <p className="text-lg">
-              日本語語彙力診断（以下简称"本网站"）致力于保护用户的隐私和个人信息。本隐私政策详细说明了我们如何收集、使用、存储和保护您的个人信息。
+              日本語語彙力診断（以下简称&quot;本网站&quot;）致力于保护用户的隐私和个人信息。本隐私政策详细说明了我们如何收集、使用、存储和保护您的个人信息。
             </p>
 
             <section>
